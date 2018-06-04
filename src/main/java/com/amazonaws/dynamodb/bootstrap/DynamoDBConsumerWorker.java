@@ -38,6 +38,7 @@ public class DynamoDBConsumerWorker implements Callable<Void> {
     private long exponentialBackoffTime;
     private BatchWriteItemRequest batch;
     private final String tableName;
+    static long writtenCount = 0;
 
     /**
      * Callable class that when called will try to write a batch to a DynamoDB
@@ -70,6 +71,11 @@ public class DynamoDBConsumerWorker implements Callable<Void> {
         return null;
     }
 
+    public static void logCount() {
+        System.out.println("Written items count : " + writtenCount);
+        return;
+    }
+
     /**
      * Writes to DynamoDBTable using an exponential backoff. If the
      * batchWriteItem returns unprocessed items then it will exponentially
@@ -80,10 +86,19 @@ public class DynamoDBConsumerWorker implements Callable<Void> {
         List<ConsumedCapacity> consumedCapacities = new LinkedList<ConsumedCapacity>();
         Map<String, List<WriteRequest>> unprocessedItems = null;
         boolean interrupted = false;
+        long allItemSize = 0;
         try {
             do {
                 writeItemResult = client.batchWriteItem(req);
                 unprocessedItems = writeItemResult.getUnprocessedItems();
+                if (req.getRequestItems().size() > 0) {
+                    long itemSize = req.getRequestItems().get(tableName).size();
+                    long unprocessedItemSize = 0;
+                    if (unprocessedItems.size() > 0) {
+                        unprocessedItemSize = unprocessedItems.get(tableName).size();
+                    }
+                    allItemSize = allItemSize + (itemSize - unprocessedItemSize);
+                }
                 consumedCapacities
                         .addAll(writeItemResult.getConsumedCapacity());
 
@@ -101,9 +116,14 @@ public class DynamoDBConsumerWorker implements Callable<Void> {
                     }
                 }
             } while (unprocessedItems != null && unprocessedItems.get(tableName) != null);
+            synchronized (DynamoDBConsumerWorker.class) {
+                writtenCount = writtenCount + allItemSize;
+                logCount();
+            }
             return consumedCapacities;
         } finally {
             if (interrupted) {
+                System.out.println("**** Thread INTERRUPTED **** UnprocessedItems count : " + unprocessedItems.get(tableName).size());
                 Thread.currentThread().interrupt();
             }
         }

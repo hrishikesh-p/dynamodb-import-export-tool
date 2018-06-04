@@ -93,7 +93,7 @@ public class CommandLineInterface {
                 sourceTable).getTable();
         TableDescription writeTableDescription = destinationClient
                 .describeTable(destinationTable).getTable();
-        int numSegments = 10;
+        int numSegments = 100; // TODO: Make it configurable from the Params
         try {
             numSegments = DynamoDBBootstrapWorker
                     .getNumberOfSegments(readTableDescription);

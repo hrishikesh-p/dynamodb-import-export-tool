@@ -100,6 +100,7 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
      */
     public void pipe(final AbstractLogConsumer consumer)
             throws ExecutionException, InterruptedException {
+        long totalItemsFetched = 0;
         final DynamoDBTableScan scanner = new DynamoDBTableScan(rateLimit,
                 client);
 
@@ -114,7 +115,9 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
 
         while (!scanService.finished()) {
             SegmentedScanResult result = scanService.grab();
+            totalItemsFetched = totalItemsFetched + result.getScanResult().getCount();
             consumer.writeResult(result);
+            System.out.println("Fetched items count : " + totalItemsFetched);
         }
 
         shutdown(true);
