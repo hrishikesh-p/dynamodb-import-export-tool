@@ -46,6 +46,22 @@ public class CommandLineArgs {
         return sourceTable;
     }
 
+    public static final String FILTER_EXPR = "--filterExpr";
+    @Parameter(names = FILTER_EXPR, description = "Filter to apply", required = false)
+    private String filterExpr;
+
+    public String getFilterExpr() {
+        return filterExpr;
+    }
+
+    public static final String EXPR_ATTR_VALS = "--exprAttrVals";
+    @Parameter(names = EXPR_ATTR_VALS, description = "Filter expr values", required = false)
+    private String exprAttrVals;
+
+    public String getExprAttrVals() {
+        return exprAttrVals;
+    }
+
     public static final String DESTINATION_ENDPOINT = "--destinationEndpoint";
     @Parameter(names = DESTINATION_ENDPOINT, description = "Endpoint of the destination table", required = true)
     private String destinationEndpoint;

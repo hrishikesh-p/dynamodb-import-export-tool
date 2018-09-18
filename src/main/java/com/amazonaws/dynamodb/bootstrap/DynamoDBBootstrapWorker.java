@@ -14,18 +14,20 @@
  */
 package com.amazonaws.dynamodb.bootstrap;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import com.amazonaws.dynamodb.bootstrap.constants.BootstrapConstants;
 import com.amazonaws.dynamodb.bootstrap.exception.NullReadCapacityException;
 import com.amazonaws.dynamodb.bootstrap.exception.SectionOutOfRangeException;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
-import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputDescription;
-import com.amazonaws.services.dynamodbv2.model.ReturnConsumedCapacity;
-import com.amazonaws.services.dynamodbv2.model.ScanRequest;
-import com.amazonaws.services.dynamodbv2.model.TableDescription;
+import com.amazonaws.services.dynamodbv2.model.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import com.google.gson.Gson;
 
 /**
  * The base class to start a parallel scan and connect the results with a
@@ -36,9 +38,11 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
     private final double rateLimit;
     private final String tableName;
     private final int numSegments;
+    private final String exprAttributeValues;
     private int section;
     private int totalSections;
     private final boolean consistentScan;
+    private String filterExpression;
 
     /**
      * Creates the DynamoDBBootstrapWorker, calculates the number of segments a
@@ -49,7 +53,7 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
     public DynamoDBBootstrapWorker(AmazonDynamoDBClient client,
             double rateLimit, String tableName, ExecutorService exec,
             int section, int totalSections, int numSegments,
-            boolean consistentScan) throws SectionOutOfRangeException {
+            boolean consistentScan, String filterExpression, String exprAttributeValues) throws SectionOutOfRangeException {
         if (section > totalSections - 1 || section < 0) {
             throw new SectionOutOfRangeException(
                     "Section of scan must be within [0...totalSections-1]");
@@ -58,6 +62,8 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
         this.client = client;
         this.rateLimit = rateLimit;
         this.tableName = tableName;
+        this.filterExpression = filterExpression;
+        this.exprAttributeValues = exprAttributeValues;
 
         this.numSegments = numSegments;
         this.section = section;
@@ -71,7 +77,7 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
      * Creates the DynamoDBBootstrapWorker, calculates the number of segments a
      * table should have, and creates a thread pool to prepare to scan using an
      * eventually consistent scan.
-     * 
+     *
      * @throws Exception
      */
     public DynamoDBBootstrapWorker(AmazonDynamoDBClient client,
@@ -92,6 +98,16 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
             numThreads = numProcessors;
         }
         super.threadPool = Executors.newFixedThreadPool(numThreads);
+
+        this.filterExpression = null;
+        this.exprAttributeValues = null;
+    }
+
+    public DynamoDBBootstrapWorker(AmazonDynamoDBClient client,
+                                   double rateLimit, String tableName, ExecutorService exec,
+                                   int section, int totalSections, int numSegments,
+                                   boolean consistentScan) throws SectionOutOfRangeException {
+        this(client, rateLimit, tableName, exec,section,totalSections,numSegments,consistentScan, null, null);
     }
 
     /**
@@ -108,6 +124,14 @@ public class DynamoDBBootstrapWorker extends AbstractLogProvider {
                 .withReturnConsumedCapacity(ReturnConsumedCapacity.TOTAL)
                 .withLimit(BootstrapConstants.SCAN_LIMIT)
                 .withConsistentRead(consistentScan);
+
+        if(filterExpression !=null ){
+            System.out.println("Applying filter : " + filterExpression);
+            System.out.println("Applying values : " + exprAttributeValues);
+            request.withFilterExpression(filterExpression)
+                    .withExpressionAttributeValues(new DynamoDBAttributeParser(exprAttributeValues).parse());
+            System.out.println("request " + request.toString());
+        }
 
         final ParallelScanExecutor scanService = scanner
                 .getParallelScanCompletionService(request, numSegments,

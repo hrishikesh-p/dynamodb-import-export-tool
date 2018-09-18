@@ -74,6 +74,8 @@ public class CommandLineInterface {
         final String destinationEndpoint = params.getDestinationEndpoint();
         final String destinationTable = params.getDestinationTable();
         final String sourceTable = params.getSourceTable();
+        final String filterExpr = params.getFilterExpr();
+        final String exprAttrVals = params.getExprAttrVals();
         final double readThroughputRatio = params.getReadThroughputRatio();
         final double writeThroughputRatio = params.getWriteThroughputRatio();
         final int maxWriteThreads = params.getMaxWriteThreads();
@@ -115,7 +117,8 @@ public class CommandLineInterface {
 
             final DynamoDBBootstrapWorker worker = new DynamoDBBootstrapWorker(
                     sourceClient, readThroughput, sourceTable, sourceExec,
-                    params.getSection(), params.getTotalSections(), numSegments, consistentScan);
+                    params.getSection(), params.getTotalSections(), numSegments, consistentScan,
+                    filterExpr, exprAttrVals);
 
             LOGGER.info("Starting transfer...");
             worker.pipe(consumer);
