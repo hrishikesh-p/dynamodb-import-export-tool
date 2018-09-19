@@ -61,13 +61,20 @@ public class DynamoDBConsumerWorker implements Callable<Void> {
      */
     @Override
     public Void call() {
-        List<ConsumedCapacity> batchResult = runWithBackoff(batch);
-        Iterator<ConsumedCapacity> it = batchResult.iterator();
-        int consumedCapacity = 0;
-        while (it.hasNext()) {
-            consumedCapacity += it.next().getCapacityUnits().intValue();
+        try {
+            List<ConsumedCapacity> batchResult = runWithBackoff(batch);
+            Iterator<ConsumedCapacity> it = batchResult.iterator();
+            int consumedCapacity = 0;
+            while (it.hasNext()) {
+                consumedCapacity += it.next().getCapacityUnits().intValue();
+            }
+            rateLimiter.acquire(consumedCapacity);
         }
-        rateLimiter.acquire(consumedCapacity);
+        catch(Exception e){
+            System.out.println("Exception occured while processing writes " + e.getMessage());
+            e.printStackTrace(System.out);
+            throw e;
+        }
         return null;
     }
 
